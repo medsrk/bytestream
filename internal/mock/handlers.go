@@ -6,7 +6,7 @@ import (
 )
 
 func RegisterRoutes(mux *http.ServeMux) {
-	mux.HandleFunc("GET /indentity/userinfo", handleUserInfo)
+	mux.HandleFunc("GET /identity/userinfo", handleUserInfo)
 	mux.HandleFunc("GET /availability/availabilityinfo/46325", handleAvailability)
 }
 
