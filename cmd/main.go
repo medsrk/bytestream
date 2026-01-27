@@ -1,32 +1,46 @@
 package main
 
 import (
+	"bytestream/internal/config"
 	"bytestream/internal/handlers"
 	"bytestream/internal/logging"
 	"bytestream/internal/mock"
 	"bytestream/internal/services"
+	"context"
+	"errors"
 	"log"
 	"net/http"
+	"os"
+	"os/signal"
+	"syscall"
 	"time"
 )
 
 var port = ":8080"
 
 func main() {
-	httpClient := &http.Client{
-		Timeout: 10 * time.Second,
+	cfg, err := config.Load()
+	if err != nil {
+		log.Fatalf("loading config: %v", err)
 	}
 
-	identityClient := services.NewIdentityClient("http://localhost"+port, httpClient)
-	availabilityClient := services.NewAvailabilityClient("http://localhost"+port, httpClient)
-	
-	vlogger := logging.NewLogger("local", "video")
+	httpClient := &http.Client{
+		Timeout: cfg.HTTPTimeout,
+	}
+
+	identityClient := services.NewIdentityClient(cfg.IdentityURL, httpClient)
+	availabilityClient := services.NewAvailabilityClient(cfg.AvailabilityURL, httpClient)
+
+	logger := logging.NewLogger(cfg.Env, "bytestream_video")
+
+	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
+	defer stop()
 
 	videoService := services.NewVideoService(
 		identityClient,
 		availabilityClient,
-		"https://s3.eu-west-1.amazon.com/bytestreamfake",
-		vlogger,
+		cfg.S3BaseURL,
+		logger,
 	)
 
 	videoHandler := handlers.NewVideoHandler(videoService)
@@ -37,6 +51,31 @@ func main() {
 
 	mux.HandleFunc("GET /video/{video_id}", videoHandler.GetVideo)
 
-	log.Printf("server listening on %s", port)
-	log.Fatal(http.ListenAndServe(port, mux))
+	server := &http.Server{
+		Addr:    cfg.Port,
+		Handler: mux,
+	}
+
+	go func() {
+		logger.Info("server_start", "port", cfg.Port)
+		if err := server.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
+			logger.Error("server_error", "error", err.Error())
+			os.Exit(1)
+		}
+	}()
+
+	<-ctx.Done()
+	stop()
+
+	logger.Info("server_shutdown", "status", "shutting down")
+
+	shutdownCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	if err := server.Shutdown(shutdownCtx); err != nil {
+		logger.Error("server_shutdown", "error", err.Error())
+		os.Exit(1)
+	}
+
+	logger.Info("server_shutdown", "status", "complete")
 }
