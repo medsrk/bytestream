@@ -38,7 +38,7 @@ func NewVideoService(identity IdentityProvider, availability AvailabilityProvide
 func (s *VideoService) ResolveVideo(ctx context.Context, token string, videoID int) (*models.VideoResponse, error) {
 	metadata, exists := s.videoCatalog[videoID]
 	if !exists {
-		return nil, fmt.Errorf("video not found")
+		return nil, models.ErrVideoNotFound
 	}
 
 	identity, err := s.identityClient.GetUserInfo(ctx, token)
@@ -52,7 +52,7 @@ func (s *VideoService) ResolveVideo(ctx context.Context, token string, videoID i
 	}
 
 	if !availability.IsAvailable(time.Now()) {
-		return nil, fmt.Errorf("video not available")
+		return nil, models.ErrVideoUnavailable
 	}
 
 	filename := metadata.Filename

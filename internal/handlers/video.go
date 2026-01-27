@@ -50,9 +50,9 @@ func (h *VideoHandler) GetVideo(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		log.Printf("Error resolving video: %v", err)
 
-		if strings.Contains(err.Error(), "not found") {
+		if errors.Is(err, models.ErrVideoNotFound) {
 			writeError(w, http.StatusNotFound, "video not found")
-		} else if strings.Contains(err.Error(), "not available") {
+		} else if errors.Is(err, models.ErrVideoUnavailable) {
 			writeError(w, http.StatusNotFound, "video not available")
 		} else {
 			writeError(w, http.StatusServiceUnavailable, "service unavailable")
@@ -65,6 +65,7 @@ func (h *VideoHandler) GetVideo(w http.ResponseWriter, r *http.Request) {
 }
 
 func writeError(w http.ResponseWriter, status int, err string) {
+	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(status)
-	json.NewEncoder(w).Encode(err)
+	json.NewEncoder(w).Encode(models.ErrorResponse{Error: err})
 }
