@@ -5,6 +5,8 @@ import (
 	"context"
 	"log/slog"
 	"time"
+
+	"golang.org/x/sync/errgroup"
 )
 
 type IdentityProvider interface {
@@ -45,15 +47,30 @@ func (s *VideoService) ResolveVideo(ctx context.Context, token string, videoID i
 		return nil, models.ErrVideoNotFound
 	}
 
-	identity, err := s.identityClient.GetUserInfo(ctx, token)
-	if err != nil {
-		s.logUpstreamErr(log, "identity", err)
-		return nil, err
-	}
+	var identity *models.IdentityResponse
+	var availability *models.AvailabilityResponse
 
-	availability, err := s.availabilityClient.GetAvailabilityInfo(ctx, token, videoID)
-	if err != nil {
-		s.logUpstreamErr(log, "availability", err)
+	g, ctx := errgroup.WithContext(ctx)
+
+	g.Go(func() error {
+		var err error
+		identity, err = s.identityClient.GetUserInfo(ctx, token)
+		if err != nil && ctx.Err() == nil { // only log id we get an error, not if the context is canceled
+			s.logUpstreamErr(log, "identity", err)
+		}
+		return err
+	})
+
+	g.Go(func() error {
+		var err error
+		availability, err = s.availabilityClient.GetAvailabilityInfo(ctx, token, videoID)
+		if err != nil && ctx.Err() == nil {
+			s.logUpstreamErr(log, "availability", err)
+		}
+		return err
+	})
+
+	if err := g.Wait(); err != nil {
 		return nil, err
 	}
 
