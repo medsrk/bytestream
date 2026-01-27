@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytestream/internal/handlers"
+	"bytestream/internal/logging"
 	"bytestream/internal/mock"
 	"bytestream/internal/services"
 	"log"
@@ -18,11 +19,14 @@ func main() {
 
 	identityClient := services.NewIdentityClient("http://localhost"+port, httpClient)
 	availabilityClient := services.NewAvailabilityClient("http://localhost"+port, httpClient)
+	
+	vlogger := logging.NewLogger("local", "video")
 
 	videoService := services.NewVideoService(
 		identityClient,
 		availabilityClient,
 		"https://s3.eu-west-1.amazon.com/bytestreamfake",
+		vlogger,
 	)
 
 	videoHandler := handlers.NewVideoHandler(videoService)

@@ -3,7 +3,7 @@ package services
 import (
 	"bytestream/internal/models"
 	"context"
-	"fmt"
+	"log/slog"
 	"time"
 )
 
@@ -19,13 +19,15 @@ type VideoService struct {
 	availabilityClient AvailabilityProvider
 	s3BaseURL          string
 	videoCatalog       map[int]models.VideoMetadata
+	logger             *slog.Logger
 }
 
-func NewVideoService(identity IdentityProvider, availability AvailabilityProvider, s3BaseURL string) *VideoService {
+func NewVideoService(identity IdentityProvider, availability AvailabilityProvider, s3BaseURL string, logger *slog.Logger) *VideoService {
 	return &VideoService{
 		identityClient:     identity,
 		availabilityClient: availability,
 		s3BaseURL:          s3BaseURL,
+		logger:             logger,
 		videoCatalog: map[int]models.VideoMetadata{
 			46325: {
 				Title:    "Example Video 001",
@@ -36,6 +38,8 @@ func NewVideoService(identity IdentityProvider, availability AvailabilityProvide
 }
 
 func (s *VideoService) ResolveVideo(ctx context.Context, token string, videoID int) (*models.VideoResponse, error) {
+	log := s.logger.With("video_id", videoID)
+
 	metadata, exists := s.videoCatalog[videoID]
 	if !exists {
 		return nil, models.ErrVideoNotFound
@@ -43,12 +47,14 @@ func (s *VideoService) ResolveVideo(ctx context.Context, token string, videoID i
 
 	identity, err := s.identityClient.GetUserInfo(ctx, token)
 	if err != nil {
-		return nil, fmt.Errorf("getting user info: %w", err)
+		s.logUpstreamErr(log, "identity", err)
+		return nil, err
 	}
 
 	availability, err := s.availabilityClient.GetAvailabilityInfo(ctx, token, videoID)
 	if err != nil {
-		return nil, fmt.Errorf("getting availability: %w", err)
+		s.logUpstreamErr(log, "availability", err)
+		return nil, err
 	}
 
 	if !availability.IsAvailable(time.Now()) {
@@ -67,4 +73,8 @@ func (s *VideoService) ResolveVideo(ctx context.Context, token string, videoID i
 		PlaybackFilename:  filename,
 		PlaybackExtension: ".mp4",
 	}, nil
+}
+
+func (s *VideoService) logUpstreamErr(log *slog.Logger, upstream string, err error) {
+	log.Error("upstream_failure", "upstream", upstream, "error", err.Error())
 }

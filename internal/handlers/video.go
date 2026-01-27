@@ -5,7 +5,6 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
-	"log"
 	"net/http"
 	"strconv"
 	"strings"
@@ -48,8 +47,6 @@ func (h *VideoHandler) GetVideo(w http.ResponseWriter, r *http.Request) {
 
 	video, err := h.videoService.ResolveVideo(r.Context(), token, videoID)
 	if err != nil {
-		log.Printf("Error resolving video: %v", err)
-
 		if errors.Is(err, models.ErrVideoNotFound) {
 			writeError(w, http.StatusNotFound, "video not found")
 		} else if errors.Is(err, models.ErrVideoUnavailable) {
