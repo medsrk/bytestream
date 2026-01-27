@@ -1,19 +1,25 @@
 package handlers
 
 import (
-	"bytestream/internal/services"
+	"bytestream/internal/models"
+	"context"
 	"encoding/json"
+	"errors"
 	"log"
 	"net/http"
 	"strconv"
 	"strings"
 )
 
-type VideoHandler struct {
-	videoService *services.VideoService
+type VideoResolver interface {
+	ResolveVideo(ctx context.Context, token string, videoID int) (*models.VideoResponse, error)
 }
 
-func NewVideoHandler(videoService *services.VideoService) *VideoHandler {
+type VideoHandler struct {
+	videoService VideoResolver
+}
+
+func NewVideoHandler(videoService VideoResolver) *VideoHandler {
 	return &VideoHandler{
 		videoService: videoService,
 	}

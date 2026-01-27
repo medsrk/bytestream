@@ -7,14 +7,21 @@ import (
 	"time"
 )
 
+type IdentityProvider interface {
+	GetUserInfo(ctx context.Context, token string) (*models.IdentityResponse, error)
+}
+
+type AvailabilityProvider interface {
+	GetAvailabilityInfo(ctx context.Context, token string, videoID int) (*models.AvailabilityResponse, error)
+}
 type VideoService struct {
-	identityClient     *IdentityClient
-	availabilityClient *AvailabilityClient
+	identityClient     IdentityProvider
+	availabilityClient AvailabilityProvider
 	s3BaseURL          string
 	videoCatalog       map[int]models.VideoMetadata
 }
 
-func NewVideoService(identity *IdentityClient, availability *AvailabilityClient, s3BaseURL string) *VideoService {
+func NewVideoService(identity IdentityProvider, availability AvailabilityProvider, s3BaseURL string) *VideoService {
 	return &VideoService{
 		identityClient:     identity,
 		availabilityClient: availability,
