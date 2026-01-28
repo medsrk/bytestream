@@ -38,12 +38,12 @@ func (h *VideoHandler) GetVideo(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	token := strings.TrimPrefix(authHeader, "bearer ")
-	token = strings.TrimPrefix(token, "Bearer ")
-	if token == authHeader {
-		writeError(w, http.StatusUnauthorized, "invalid auth header format")
+	const prefix = "bearer "
+	if !strings.HasPrefix(strings.ToLower(authHeader), prefix) {
+		writeError(w, http.StatusUnauthorized, "invalid auth header")
 		return
 	}
+	token := authHeader[len(prefix):]
 
 	video, err := h.videoService.ResolveVideo(r.Context(), token, videoID)
 	if err != nil {

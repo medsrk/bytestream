@@ -16,8 +16,6 @@ import (
 	"time"
 )
 
-var port = ":8080"
-
 func main() {
 	cfg, err := config.Load()
 	if err != nil {
